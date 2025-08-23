@@ -1,10 +1,9 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from scan import scan_document as scan_module  # Import the scan function
 import os
 import uuid
-import subprocess
-import sys
 from pathlib import Path
 
 app = FastAPI(title="Document Scanner API", version="1.0.0")
@@ -12,7 +11,7 @@ app = FastAPI(title="Document Scanner API", version="1.0.0")
 # Create necessary directories
 UPLOAD_DIR = "uploads"
 OUTPUT_DIR = "saved_images"
-STATIC_DIR = "static"
+STATIC_DIR = "src/static"
 
 for directory in [UPLOAD_DIR, OUTPUT_DIR, STATIC_DIR]:
     os.makedirs(directory, exist_ok=True)
@@ -23,7 +22,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 @app.get("/", response_class=HTMLResponse)
 async def home():
     """Serve the main HTML page"""
-    return FileResponse("static/index.html")
+    return FileResponse("src/static/index.html")
 
 @app.post("/scan")
 async def scan_document(file: UploadFile = File(...)):
@@ -47,25 +46,18 @@ async def scan_document(file: UploadFile = File(...)):
             content = await file.read()
             buffer.write(content)
         
-        # Run the scan.py script with the uploaded image
-        result = subprocess.run([
-            sys.executable, "scan.py", 
-            "-i", upload_path
-        ], capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            raise HTTPException(status_code=500, detail=f"Scanning failed: {result.stderr}")
-        
-        # Find the scanned output file
-        input_filename = os.path.basename(upload_path)
-        name, ext = os.path.splitext(input_filename)
-        scanned_path = os.path.join(OUTPUT_DIR, f"{name}_scanned.png")
+        # Use the imported scan module instead of subprocess
+        try:
+            scanned_path = scan_module(upload_path, OUTPUT_DIR)
+        except Exception as scan_error:
+            raise HTTPException(status_code=500, detail=f"Scanning failed: {str(scan_error)}")
         
         if not os.path.exists(scanned_path):
             raise HTTPException(status_code=500, detail="Scanned image not found")
         
         # Clean up the uploaded file
-        os.remove(upload_path)
+        if os.path.exists(upload_path):
+            os.remove(upload_path)
         
         # Return the scanned image for download
         def iter_file():
@@ -80,16 +72,14 @@ async def scan_document(file: UploadFile = File(...)):
             }
         )
         
-        # Clean up scanned file after a delay (in production, use a cleanup job)
-        # For now, we'll leave it for manual cleanup or implement async cleanup
+        # Optional: Clean up scanned file after serving
+        # Note: In production, implement proper cleanup strategy
         
         return response
         
-    except subprocess.CalledProcessError as e:
-        # Clean up files in case of error
-        if os.path.exists(upload_path):
-            os.remove(upload_path)
-        raise HTTPException(status_code=500, detail=f"Error running scanner: {str(e)}")
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         # Clean up files in case of error
         if os.path.exists(upload_path):
@@ -103,4 +93,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)

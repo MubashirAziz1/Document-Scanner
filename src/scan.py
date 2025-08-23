@@ -11,70 +11,76 @@ def scan_document(image_path, output_dir='saved_images'):
     Scan a document from the given image path
     Returns the output path of the scanned image
     """
-    # load the image and compute the ratio of the old height
-    # to the new height, clone it, and resize it
-    img = cv2.imread(image_path)
-    if img is None:
-        raise ValueError(f"Could not load image from {image_path}")
+    try:
+        # load the image and compute the ratio of the old height
+        # to the new height, clone it, and resize it
+        img = cv2.imread(image_path)
+        if img is None:
+            raise ValueError(f"Could not load image from {image_path}")
+            
+        ratio = img.shape[0] / 500.0
+        orig = img.copy()
+        img = imutils.resize(img, height=500)
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        gray = cv2.GaussianBlur(gray, (5, 5), 0)
+        edged = cv2.Canny(gray, 75, 200)
+
+        # find the contours in the edged image, keeping only the
+        # largest ones, and initialize the screen contour
+        cnts = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
+        cnts = sorted(cnts, key=cv2.contourArea, reverse=True)
+
+        screenCnt = None
+        for c in cnts:
+            peri = cv2.arcLength(c, True)
+            approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+
+            # if our approximated contour has four points, then we
+            # can assume that we have found our screen
+            if len(approx) == 4:
+                screenCnt = approx
+                break
+
+        if screenCnt is None:
+            # If no contour found, use the whole image
+            h, w = orig.shape[:2]
+            screenCnt = np.array([[[0, 0]], [[w, 0]], [[w, h]], [[0, h]]])
+
+        print("Step 2: Find contours of paper")
+
+        # apply the four point transform to obtain a top-down
+        # view of the original image
+        warped = four_point_transform(orig, screenCnt.reshape(4, 2) * ratio)
+
+        # convert the warped image to grayscale, then threshold it
+        # to give it that 'black and white' paper effect
+        warped = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+        T = threshold_local(warped, 11, offset=10, method='gaussian')
+        warped = (warped > T).astype('uint8') * 255
+
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+
+        input_filename = os.path.basename(image_path)
+        name, ext = os.path.splitext(input_filename)
+        output_path = os.path.join(output_dir, f"{name}_scanned.png")
+
+        # save the scanned image
+        cv2.imwrite(output_path, warped)
+        print(f"Scanned image saved at: {output_path}")
         
-    ratio = img.shape[0] / 500.0
-    orig = img.copy()
-    img = imutils.resize(img, height = 500)
-
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = cv2.GaussianBlur(gray, (5,5), 0)
-    edged = cv2.Canny(gray, 75, 200)
-
-    # find the contours in the edged image, keeping only the
-    # largest ones, and initialize the screen contour
-    cnts = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    cnts = imutils.grab_contours(cnts)
-    cnts = sorted(cnts, key = cv2.contourArea, reverse = True)
-
-    screenCnt = None
-    for c in cnts:
-        peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.02*peri, True)
-
-        # if our approximated contour has four points, then we
-        # can assume that we have found our screen
-        if len(approx) == 4:
-            screenCnt = approx
-            break
-
-    if screenCnt is None:
-        # If no contour found, use the whole image
-        h, w = orig.shape[:2]
-        screenCnt = np.array([[[0, 0]], [[w, 0]], [[w, h]], [[0, h]]])
-
-    print("Step 2: Find countours of paper")
-
-    # apply the four point transform to obtain a top-down
-    # view of the original image
-    warped = four_point_transform(orig, screenCnt.reshape(4,2)*ratio)
-
-    # convert the warped image to grayscale, then threshold it
-    # to give it that 'black and white' paper effect
-    warped = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-    T = threshold_local(warped, 11, offset = 10 , method = 'gaussian')
-    warped = (warped > T).astype('uint8') * 255
-
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok = True)
-
-    input_filename = os.path.basename(image_path)
-    name, ext = os.path.splitext(input_filename)
-    output_path = os.path.join(output_dir, f"{name}_scanned.png")
-
-    # save the scanned image
-    cv2.imwrite(output_path, warped)
-    print(f"Scanned image saved at: {output_path}")
-    
-    return output_path
+        return output_path
+        
+    except Exception as e:
+        print(f"Error in scan_document: {e}")
+        raise e
 
 if __name__ == "__main__":
+    # Command line interface
     ap = argparse.ArgumentParser()
-    ap.add_argument('-i', '--image', required = True, help = 'Path to the image to be scanned')
+    ap.add_argument('-i', '--image', required=True, help='Path to the image to be scanned')
     args = vars(ap.parse_args())
 
     try:
@@ -85,9 +91,9 @@ if __name__ == "__main__":
         warped = cv2.imread(output_path, cv2.IMREAD_GRAYSCALE)
         
         print("STEP 3: Apply perspective transform")
-        # Uncomment these lines if you want to display the images
-        # cv2.imshow('Original', imutils.resize(orig, height = 650))
-        # cv2.imshow('Scanned', imutils.resize(warped, height = 650))
+        # Uncomment these lines if you want to display the images in CLI mode
+        # cv2.imshow('Original', imutils.resize(orig, height=650))
+        # cv2.imshow('Scanned', imutils.resize(warped, height=650))
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
         
