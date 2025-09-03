@@ -19,4 +19,4 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Run the app
-CMD ["python3", "app.py"]
+CMD ["python3", "src/app.py"]

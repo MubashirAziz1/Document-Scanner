@@ -7,10 +7,7 @@ import imutils
 import os
 
 def scan_document(image_path, output_dir='saved_images'):
-    """
-    Scan a document from the given image path
-    Returns the output path of the scanned image
-    """
+
     try:
         # load the image and compute the ratio of the old height
         # to the new height, clone it, and resize it
@@ -26,8 +23,7 @@ def scan_document(image_path, output_dir='saved_images'):
         gray = cv2.GaussianBlur(gray, (5, 5), 0)
         edged = cv2.Canny(gray, 75, 200)
 
-        # find the contours in the edged image, keeping only the
-        # largest ones, and initialize the screen contour
+        # find the contours in the edged image
         cnts = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
         cnts = sorted(cnts, key=cv2.contourArea, reverse=True)
@@ -37,14 +33,12 @@ def scan_document(image_path, output_dir='saved_images'):
             peri = cv2.arcLength(c, True)
             approx = cv2.approxPolyDP(c, 0.02 * peri, True)
 
-            # if our approximated contour has four points, then we
-            # can assume that we have found our screen
             if len(approx) == 4:
                 screenCnt = approx
                 break
 
         if screenCnt is None:
-            # If no contour found, use the whole image
+           
             h, w = orig.shape[:2]
             screenCnt = np.array([[[0, 0]], [[w, 0]], [[w, h]], [[0, h]]])
 
@@ -78,7 +72,7 @@ def scan_document(image_path, output_dir='saved_images'):
         raise e
 
 if __name__ == "__main__":
-    # Command line interface
+
     ap = argparse.ArgumentParser()
     ap.add_argument('-i', '--image', required=True, help='Path to the image to be scanned')
     args = vars(ap.parse_args())
@@ -90,12 +84,6 @@ if __name__ == "__main__":
         orig = cv2.imread(args['image'])
         warped = cv2.imread(output_path, cv2.IMREAD_GRAYSCALE)
         
-        print("STEP 3: Apply perspective transform")
-        # Uncomment these lines if you want to display the images in CLI mode
-        # cv2.imshow('Original', imutils.resize(orig, height=650))
-        # cv2.imshow('Scanned', imutils.resize(warped, height=650))
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
         
     except Exception as e:
         print(f"Error: {e}")
