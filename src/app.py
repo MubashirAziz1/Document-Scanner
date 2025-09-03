@@ -27,8 +27,7 @@ async def scan_document(file: UploadFile = File(...)):
     
     # Scan document
     scanned_path = scan_module(upload_path, "saved_images")
-    
-    # Return scanned image
+
     def iter_file():
         with open(scanned_path, 'rb') as file_like:
             yield from file_like

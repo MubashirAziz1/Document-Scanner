@@ -79,8 +79,7 @@ if __name__ == "__main__":
 
     try:
         output_path = scan_document(args['image'])
-        
-        # Load and display images (optional for CLI usage)
+
         orig = cv2.imread(args['image'])
         warped = cv2.imread(output_path, cv2.IMREAD_GRAYSCALE)
         
