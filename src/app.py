@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from scan import scan_document as scan_module
+from .scan import scan_document as scan_module
 import os
 
 app = FastAPI()

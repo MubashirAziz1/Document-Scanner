@@ -18,5 +18,8 @@ RUN apt-get update && apt-get install -y \
 # Install Python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Expose port
+EXPOSE 8000
+
 # Run the app
-CMD ["python3", "src/app.py"]
+CMD ["uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000"]
